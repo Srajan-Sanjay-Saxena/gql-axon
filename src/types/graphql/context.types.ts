@@ -1,4 +1,6 @@
 import type { Request } from "express";
+import type { ValidDataBrand } from "../brand.helper.js";
+import type { GqlRequestConfig } from "./resolver.types.js";
 
 type GqlGlobalBaseContext<TBaseContext> = TBaseContext & {
   req: Request;
@@ -7,9 +9,12 @@ type GqlGlobalBaseContext<TBaseContext> = TBaseContext & {
 type MagicInjectedContext<TInjected, TBaseContext> = TInjected &
   GqlGlobalBaseContext<TBaseContext>;
 
-type VerifiedContext<TConfig extends { context?: Record<string, unknown> }, TBaseContext> =
-  TConfig["context"] extends Record<string, any>
-    ? MagicInjectedContext<TConfig["context"], TBaseContext>
+type VerifiedContext<
+  TConfig extends GqlRequestConfig["context"],
+  TBaseContext,
+> =
+  TConfig extends Record<string, any>
+    ? ValidDataBrand<MagicInjectedContext<TConfig["context"], TBaseContext>>
     : TBaseContext;
 
 export type { GqlGlobalBaseContext, MagicInjectedContext, VerifiedContext };
