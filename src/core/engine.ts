@@ -6,8 +6,10 @@ import {
 import type { ValidDataBrand } from "../types/brand.helper.js";
 import type {
   GqlAsyncResolver,
+  GqlContextAndArgsMiddleware,
   GqlRequestConfig,
   SchemaConfig,
+  VerifiedArgs,
 } from "../types/graphql/resolver.types.js";
 import type {
   GqlGlobalBaseContext,
@@ -53,11 +55,11 @@ export function RequestGuardMiddleware<
   TBaseContext extends GqlGlobalBaseContext<TInjected>,
 >(
   schemas: SchemaConfig<TConfig>,
-): GqlAsyncResolver<
+): GqlContextAndArgsMiddleware<
   any,
   TBaseContext,
-  unknown,
-  { validatedArgs: z.infer<TConfig["args"]> }
+  any,
+  VerifiedArgs<TConfig["args"]>
 >;
 
 export function RequestGuardMiddleware<
@@ -66,13 +68,13 @@ export function RequestGuardMiddleware<
   TBaseContext extends GqlGlobalBaseContext<TInjected>,
 >(
   schemas: SchemaConfig<TConfig>,
-): GqlAsyncResolver<any, TBaseContext, unknown, undefined>;
+): GqlContextAndArgsMiddleware<TInjected, TBaseContext, any, undefined>;
 
 export function RequestGuardMiddleware<
   TConfig extends GqlRequestConfig,
   TInjected extends Record<string, unknown>,
   TBaseContext extends GqlGlobalBaseContext<TInjected>,
->(schemas: SchemaConfig<TConfig>) {
+>(schemas: SchemaConfig<TConfig>): GqlContextAndArgsMiddleware<TInjected, TBaseContext, any, TConfig["args"]> {
   return catchGqlAsync(
     async (parent: any, args: unknown, context: TBaseContext, info: any) => {
       if (schemas.context) {
@@ -95,6 +97,8 @@ export function RequestGuardMiddleware<
         }
         return { validatedArgs: result.data };
       }
+
+      return { validatedArgs: null };
     },
-  );
+  )
 }
