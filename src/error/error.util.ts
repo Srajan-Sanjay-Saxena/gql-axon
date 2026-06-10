@@ -4,16 +4,59 @@ import {
   ValidationError,
   ConflictError,
 } from "./strategy/error.strategy.js";
-import type { GqlAsyncResolver } from "../types/graphql/resolver.types.js";
+import type {
+  GqlAsyncResolver,
+  GqlContextAndArgsMiddleware,
+  GqlGuardMiddleware,
+  GqlRequestConfig,
+} from "../types/graphql/resolver.types.js";
 import type { GqlGlobalBaseContext } from "../types/graphql/context.types.js";
 
-export const catchGqlAsync = <TParent, TArgs, TContext, TReturn>(
-  resolverFn: GqlAsyncResolver<TParent, TArgs, TContext, TReturn>,
-) => {
-  return async (
+
+export function catchGqlAsync<
+  TParent,
+  TArgs extends GqlRequestConfig["args"],
+  TContext extends Record<string, unknown>,
+>(
+  resolverFn: (
     parent: TParent,
     args: TArgs,
-    context: GqlGlobalBaseContext<TContext>,
+    context: TContext,
+    info: any,
+  ) => Promise<void>,
+): GqlGuardMiddleware<any, GqlGlobalBaseContext<TContext>, TArgs>;
+
+export function catchGqlAsync<
+  TParent,
+  TArgs extends GqlRequestConfig["args"],
+  TContext,
+  TReturn extends Record<string, unknown>,
+>(
+  resolverFn: (
+    parent: TParent,
+    args: TArgs,
+    context: TContext,
+    info: any,
+  ) => Promise<TReturn>,
+): GqlContextAndArgsMiddleware<any, GqlGlobalBaseContext<TContext>, TArgs, TReturn>;
+
+export function catchGqlAsync<TParent, TArgs, TContext, TReturn>(
+  resolverFn: (
+    parent: TParent,
+    args: TArgs,
+    context: TContext,
+    info: any,
+  ) => Promise<TReturn>,
+): <TFinalContext extends GqlGlobalBaseContext<TContext>>(
+  parent: TParent,
+  args: TArgs,
+  context: TFinalContext,
+  info: any,
+) => Promise<TReturn> {
+  return async <TFinalContext extends GqlGlobalBaseContext<TContext>>(
+    parent: TParent,
+    args: TArgs,
+    context: TFinalContext,
     info: any,
   ): Promise<TReturn> => {
     try {
@@ -21,17 +64,14 @@ export const catchGqlAsync = <TParent, TArgs, TContext, TReturn>(
     } catch (error: any) {
       console.error(`[Resolver Error] ${info.fieldName}:`, error);
 
-      // Already an operational error — rethrow for global middleware
       if (error instanceof AppError) {
         throw error;
       }
 
-      // Zod validation error
       if (error.name === "ZodError") {
         throw new ValidationError(error);
       }
 
-      // Prisma unique constraint
       if (error.code === "P2002") {
         throw new ConflictError(
           "This username or email is already taken.",
@@ -39,8 +79,7 @@ export const catchGqlAsync = <TParent, TArgs, TContext, TReturn>(
         );
       }
 
-      // Unknown error — hide details from client
       throw new InternalServerError("Something went wrong.", error);
     }
   };
-};
+}
