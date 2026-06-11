@@ -374,22 +374,6 @@ const richPostPipeline = new MiddlewareChainPipeline()
 // Final resolver sees ALL accumulated fields
 ```
 
-### withChainedMiddleware Helper
-
-```typescript
-import { withChainedMiddleware } from "gql-axon";
-
-const resolver = withChainedMiddleware(
-  new MiddlewareChainPipeline()
-    .pipe(requestGuard)
-    .pipe(isNotBlocked)
-    .pipe(addSlug),
-  async (_parent, args, context, _info) => {
-    return { slug: args.validatedArgs.slug };
-  },
-);
-```
-
 ### Reusable Pipelines
 
 ```typescript
