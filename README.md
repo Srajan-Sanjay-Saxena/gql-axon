@@ -25,6 +25,133 @@ Client → Apollo/Yoga builds context → Calls your "resolver" (which is actual
                                     GraphQL response
 ```
 
+## Quick Start: Full Apollo + Express Server
+
+```typescript
+import express from "express";
+import { ApolloServer } from "@apollo/server";
+import { expressMiddleware } from "@apollo/server/express4";
+import { z } from "zod";
+import { RequestGuardMiddleware, MiddlewareChainPipeline } from "gql-axon";
+import { catchGqlAsync, BadRequestError } from "gql-axon/errors";
+import type { VerifiedArgs } from "gql-axon/types";
+import jwt from "jsonwebtoken";
+
+// ─── 1. Define context type ─────────────────────────────────────────────────
+
+type MyContext = {
+  id?: string;
+  email?: string;
+  req: express.Request;
+};
+
+// ─── 2. Define schemas ──────────────────────────────────────────────────────
+
+const AuthContextSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+});
+type AuthContext = z.infer<typeof AuthContextSchema>;
+
+const CreatePostArgsSchema = z.object({
+  title: z.string().min(3).max(100),
+  body: z.string().min(10),
+});
+type CreatePostArgs = z.infer<typeof CreatePostArgsSchema>;
+
+// ─── 3. Build middlewares ───────────────────────────────────────────────────
+
+const createPostGuard = RequestGuardMiddleware<
+  { context: AuthContext; args: CreatePostArgs },
+  MyContext
+>({ context: AuthContextSchema, args: CreatePostArgsSchema });
+
+const isNotBlockedGuard = catchGqlAsync<CreatePostArgs, AuthContext, MyContext>(
+  async (_parent, _args, context, _info) => {
+    // const user = await db.user.findUnique({ where: { id: context.validatedContext.id } });
+    // if (user.isBlocked) throw new BadRequestError("Blocked");
+  },
+);
+
+const addSlug = catchGqlAsync<CreatePostArgs, AuthContext, MyContext, { slug: string }>(
+  async (_parent, args, _context, _info) => {
+    const slug = args.validatedArgs.title.toLowerCase().replace(/\s+/g, "-");
+    return { validatedArgs: { slug } } as VerifiedArgs<{ slug: string }>;
+  },
+);
+
+// ─── 4. Build pipeline and resolver ─────────────────────────────────────────
+
+const createPost = new MiddlewareChainPipeline()
+  .pipe(createPostGuard)
+  .pipe(isNotBlockedGuard)
+  .pipe(addSlug)
+  .execute<AuthContext, MyContext, { id: string; slug: string }>(
+    async (_parent, args, _context, _info) => {
+      // const post = await db.post.create({ data: { ... } });
+      return { id: "post_123", slug: args.validatedArgs.slug };
+    },
+  );
+
+// ─── 5. GraphQL schema ──────────────────────────────────────────────────────
+
+const typeDefs = `#graphql
+  type Post {
+    id: String!
+    slug: String!
+  }
+
+  type Mutation {
+    createPost(title: String!, body: String!): Post!
+  }
+
+  type Query {
+    _health: Boolean!
+  }
+`;
+
+const resolvers = {
+  Query: {
+    _health: () => true,
+  },
+  Mutation: {
+    createPost,  // pipeline output IS the resolver
+  },
+};
+
+// ─── 6. Wire up Apollo + Express ────────────────────────────────────────────
+
+const app = express();
+const server = new ApolloServer<MyContext>({ typeDefs, resolvers });
+
+await server.start();
+
+app.use(
+  "/graphql",
+  express.json(),
+  expressMiddleware(server, {
+    context: async ({ req }): Promise<MyContext> => {
+      // Extract user from JWT — id/email may be undefined if not authenticated
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return { req };
+
+      try {
+        const payload = jwt.verify(token, process.env.JWT_SECRET!) as { id: string; email: string };
+        return { id: payload.id, email: payload.email, req };
+      } catch {
+        return { req };
+      }
+    },
+  }),
+);
+
+app.listen(4000, () => console.log("Server ready at http://localhost:4000/graphql"));
+```
+
+That's it. The pipeline is invisible to Apollo — it just sees a resolver function.
+
+---
+
 ## Setup
 
 ### Define Your Context
@@ -333,4 +460,4 @@ The type annotation at the call site drives type safety — `catchGqlAsync` pres
 
 ## License
 
-ISC
+MIT
