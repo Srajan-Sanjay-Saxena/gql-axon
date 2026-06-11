@@ -14,14 +14,15 @@ import type {
 import type {
   GqlGlobalBaseContext,
   MagicInjectedContext,
+  VerifiedContext,
 } from "../types/graphql/context.types.js";
 import { catchGqlAsync } from "../error/error.util.js";
 import { ValidationError } from "../error/strategy/error.strategy.js";
 
-export type TypeSafeObject<TSchema> =
+export type TypeSafeObject<TObj> =
   | {
       success: true;
-      data: ValidDataBrand<z.infer<TSchema>>;
+      data: ValidDataBrand<TObj>;
       error: null;
     }
   | {
@@ -30,10 +31,10 @@ export type TypeSafeObject<TSchema> =
       error: ZodValidationError;
     };
 
-export function MakeObjectTypeSafeEngine<TSchema>(
-  schema: z.ZodType<TSchema>,
+export function MakeObjectTypeSafeEngine<TObj>(
+  schema: z.ZodType<TObj>,
   obj: unknown,
-): TypeSafeObject<TSchema> {
+): TypeSafeObject<TObj> {
   const result = schema.safeParse(obj);
   if (!result.success) {
     return {
@@ -44,61 +45,63 @@ export function MakeObjectTypeSafeEngine<TSchema>(
   }
   return {
     success: true,
-    data: result.data as ValidDataBrand<z.infer<TSchema>>,
+    data: result.data as ValidDataBrand<TObj>,
     error: null,
   };
 }
 
+// since the request guard middleware is used at the most outer side that means we can say args and context will be unknown and we will validate them inside the middleware and then inject the validated data into the context for other middlewares and resolver to use, so we can say the input context and args are unknown but the output of this middleware will be validated context and args based on the provided schemas, so we can use the same middleware for both cases when we have args schema or when we don't have args schema, if we don't have args schema then we can return undefined for args in the output
+// Overload: with args schema → no null in return
 export function RequestGuardMiddleware<
-  TConfig extends GqlRequestConfig & { args: z.ZodTypeAny },
-  TInjected extends Record<string, unknown>,
-  TBaseContext extends GqlGlobalBaseContext<TInjected>,
+  TConfig extends GqlRequestConfig & { args: Record<string, unknown> },
+  TBaseContext extends Record<string, unknown>,
 >(
   schemas: SchemaConfig<TConfig>,
-): GqlContextAndArgsMiddleware<
+): GqlAsyncResolver<
+  { validatedArgs: ValidDataBrand<TConfig["args"]> },
   any,
-  TBaseContext,
-  any,
-  VerifiedArgs<TConfig["args"]>
+  unknown,
+  unknown
 >;
 
+// Overload: without args schema → null
 export function RequestGuardMiddleware<
-  TConfig extends Exclude<GqlRequestConfig, { args: z.ZodTypeAny }>,
-  TInjected extends Record<string, unknown>,
-  TBaseContext extends GqlGlobalBaseContext<TInjected>,
+  TConfig extends GqlRequestConfig,
+  TBaseContext extends Record<string, unknown>,
 >(
   schemas: SchemaConfig<TConfig>,
-): GqlContextAndArgsMiddleware<TInjected, TBaseContext, any, undefined>;
+): GqlAsyncResolver<{ validatedArgs: null }, any, unknown, unknown>;
 
 export function RequestGuardMiddleware<
   TConfig extends GqlRequestConfig,
-  TInjected extends Record<string, unknown>,
-  TBaseContext extends GqlGlobalBaseContext<TInjected>,
->(schemas: SchemaConfig<TConfig>): GqlContextAndArgsMiddleware<TInjected, TBaseContext, any, TConfig["args"]> {
-  return catchGqlAsync(
-    async (parent: any, args: unknown, context: TBaseContext, info: any) => {
-      if (schemas.context) {
-        const result = MakeObjectTypeSafeEngine(schemas.context, context ?? {});
-        if (!result.success) {
-          throw new ValidationError(result.error);
-        }
-        (
-          context as MagicInjectedContext<
-            z.infer<TConfig["context"]>,
-            TBaseContext
-          >
-        ).validatedContext = result.data;
+  TBaseContext extends Record<string, unknown>,
+>(schemas: SchemaConfig<TConfig>) {
+  return catchGqlAsync<
+    { validatedArgs: ValidDataBrand<TConfig["args"]> | null },
+    any,
+    unknown,
+    unknown
+  >(async (parent, args, context, info) => {
+    if (schemas.context) {
+      const result = MakeObjectTypeSafeEngine(schemas.context, context ?? {});
+      if (!result.success) {
+        throw new ValidationError(result.error);
       }
+      (
+        context as VerifiedContext<TConfig["context"], TBaseContext>
+      ).validatedContext = result.data as ValidDataBrand<
+        MagicInjectedContext<TConfig["context"], TBaseContext>
+      >;
+    }
 
-      if (schemas.args) {
-        const result = MakeObjectTypeSafeEngine(schemas.args, args ?? {});
-        if (!result.success) {
-          throw new ValidationError(result.error);
-        }
-        return { validatedArgs: result.data };
+    if (schemas.args) {
+      const result = MakeObjectTypeSafeEngine(schemas.args, args ?? {});
+      if (!result.success) {
+        throw new ValidationError(result.error);
       }
+      return { validatedArgs: result.data };
+    }
 
-      return { validatedArgs: null };
-    },
-  )
+    return { validatedArgs: null };
+  });
 }
