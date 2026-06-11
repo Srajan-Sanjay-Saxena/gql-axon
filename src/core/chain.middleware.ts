@@ -11,28 +11,6 @@ import type {
   VerifiedArgs,
 } from "../types/graphql/resolver.types.js";
 
-export function withChainedMiddleware<
-  TContext extends GqlRequestConfig["context"],
-  TBaseContext extends Record<string, unknown>,
-  TAccumulated extends Record<string, any>,
-  TReturn,
->(
-  pipeline: MiddlewareChainPipeline<TAccumulated>,
-  resolver: (
-    parent: any,
-    args: TAccumulated,
-    context: VerifiedContext<TContext, TBaseContext>,
-    info: any,
-  ) => Promise<TReturn>,
-) {
-  return pipeline.execute(resolver) as (
-    parent: any,
-    args: unknown,
-    context: GqlGlobalBaseContext<any>,
-    info: any,
-  ) => Promise<TReturn>;
-}
-
 type ChainableMiddleware =
   | GqlGuardMiddleware<any, any, any>
   | GqlContextAndArgsMiddleware<any, any, any, any>
