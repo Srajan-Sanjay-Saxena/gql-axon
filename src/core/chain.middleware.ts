@@ -1,55 +1,117 @@
-import type {
-  GqlContextAndArgsMiddleware,
-  GqlGuardMiddleware,
-} from "../types/graphql/resolver.types.js";
+import type { ValidDataBrand } from "../types/brand.helper.js";
 import type {
   GqlGlobalBaseContext,
-  MagicInjectedContext,
+  VerifiedContext,
 } from "../types/graphql/context.types.js";
+import type {
+  GqlAsyncResolver,
+  GqlContextAndArgsMiddleware,
+  GqlGuardMiddleware,
+  GqlRequestConfig,
+  VerifiedArgs,
+} from "../types/graphql/resolver.types.js";
 
-type ChainableMiddleware =
-  | GqlGuardMiddleware<any, any, any>
-  | GqlContextAndArgsMiddleware<any, any, any>;
-
-type ComposedChain = (
-  context: MagicInjectedContext<any, any>,
-  args: unknown,
-) => Promise<Record<string, unknown>>;
-
-export function CreateMiddlewareChain(...middlewares: ChainableMiddleware[]): ComposedChain {
-  return async (
-    context: MagicInjectedContext<any, any>,
-    rawArgs: unknown,
-  ): Promise<Record<string, unknown>> => {
-    let accumulatedArgs: Record<string, unknown> = {};
-
-    for (const middleware of middlewares) {
-      const result = await (middleware as Function)(context, rawArgs, accumulatedArgs);
-      if (result !== undefined) {
-        accumulatedArgs = { ...accumulatedArgs, ...result };
-      }
-    }
-
-    return accumulatedArgs;
-  };
-}
-
-export function withChainedMiddleware<TReturn = unknown>(
-  chain: ComposedChain,
+export function withChainedMiddleware<
+  TContext extends GqlRequestConfig["context"],
+  TBaseContext extends Record<string, unknown>,
+  TAccumulated extends Record<string, any>,
+  TReturn,
+>(
+  pipeline: MiddlewareChainPipeline<TAccumulated>,
   resolver: (
-    parent: unknown,
-    args: Record<string, unknown>,
-    context: MagicInjectedContext<any, any>,
+    parent: any,
+    args: TAccumulated,
+    context: VerifiedContext<TContext, TBaseContext>,
     info: any,
   ) => Promise<TReturn>,
 ) {
-  return async (
-    parent: unknown,
+  return pipeline.execute(resolver) as (
+    parent: any,
     args: unknown,
     context: GqlGlobalBaseContext<any>,
     info: any,
-  ): Promise<TReturn> => {
-    const validatedArgs = await chain(context as MagicInjectedContext<any, any>, args);
-    return resolver(parent, validatedArgs, context as MagicInjectedContext<any, any>, info);
-  };
+  ) => Promise<TReturn>;
+}
+
+type ChainableMiddleware =
+  | GqlGuardMiddleware<any, any, any>
+  | GqlContextAndArgsMiddleware<any, any, any, any>
+  | GqlAsyncResolver<any, any, any, any>;
+
+export class MiddlewareChainPipeline<
+  TVerifiedArgs extends Record<string , any> = {},
+> {
+  private middlewares: ChainableMiddleware[] = [];
+  public finalArgsList: TVerifiedArgs[] = [];
+
+  public constructor(middlewares: ChainableMiddleware[] = []) {
+    this.middlewares = middlewares;
+  }
+
+  public pipe<
+    TReturn extends {
+      validatedArgs: ValidDataBrand<Record<string, unknown>> | null;
+    },
+  >(
+    middleware: GqlAsyncResolver<TReturn, unknown, unknown, any>,
+  ): MiddlewareChainPipeline<TVerifiedArgs & TReturn>;
+
+  public pipe<TReturn extends Record<string, unknown>>(
+    middleware: GqlContextAndArgsMiddleware<any, any, any, TReturn>,
+  ): MiddlewareChainPipeline<TVerifiedArgs & VerifiedArgs<TReturn>>;
+
+  public pipe(
+    middleware: GqlGuardMiddleware<any, any, any>,
+  ): MiddlewareChainPipeline<TVerifiedArgs>;
+
+  public pipe(middleware: ChainableMiddleware) {
+    this.middlewares.push(middleware);
+    return this as MiddlewareChainPipeline<any>;
+  }
+
+  public execute<
+    TInjected extends Record<string, unknown> | undefined,
+    TBaseContext extends Record<string, unknown>,
+    TReturn,
+  >(
+    resolver: (
+      parent: any,
+      args: TVerifiedArgs,
+      context: VerifiedContext<TInjected, TBaseContext>,
+      info: any,
+    ) => Promise<TReturn>,
+  ) {
+    const middlewares = this.middlewares;
+
+    // This is a killer move becasue this is what we have to return becuase of gql signature of resolver
+    return async (
+      parent: any,
+      args: any,
+      context: GqlGlobalBaseContext<any>,
+      info: any,
+    ): Promise<TReturn> => {
+      let accumulated = {} as TVerifiedArgs;
+
+      for (const mw of middlewares) {
+        const result = await mw(parent, args, context, info);
+        if (result !== undefined && result !== null) {
+          if (result.validatedArgs && accumulated.validatedArgs) {
+            accumulated = {
+              ...accumulated,
+              validatedArgs: { ...accumulated.validatedArgs, ...result.validatedArgs },
+            } as TVerifiedArgs;
+          } else {
+            accumulated = { ...accumulated, ...result };
+          }
+        }
+      }
+
+      return resolver(
+        parent,
+        accumulated,
+        context as VerifiedContext<TInjected, TBaseContext>,
+        info,
+      );
+    };
+  }
 }
