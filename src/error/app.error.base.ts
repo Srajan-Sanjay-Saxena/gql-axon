@@ -1,7 +1,19 @@
 import { GraphQLError } from 'graphql';
 
+type AppErrorExtensions = {
+  code: string;
+  http: { status: number };
+  devDetails?: {
+    errorName?: string;
+    rawMessage?: string;
+    stack?: string;
+    prismaCode?: string;
+  };
+};
+
 export class AppError extends GraphQLError {
   public isOperational: boolean;
+  public override readonly extensions: AppErrorExtensions;
 
   public constructor(
     message: string, 
@@ -34,6 +46,7 @@ export class AppError extends GraphQLError {
 
     super(finalMessage, { extensions });
     
+    this.extensions = extensions;
     this.isOperational = isOperational;
     Object.setPrototypeOf(this, new.target.prototype);
     this.name = this.constructor.name;
