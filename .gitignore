@@ -22,3 +22,7 @@ logs/
 
 coverage/
 .nyc_output/
+
+internal.md
+
+examples/
