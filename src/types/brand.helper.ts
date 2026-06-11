@@ -1,4 +1,4 @@
 declare const brand: unique symbol;
 
-type Brand<TVar, TBrand> = TVar & { [brand]: TBrand };
+type Brand<TData, TBrand> = TData & { [brand]: TBrand };
 export type ValidDataBrand<TData> = Brand<TData, "ValidData">;
