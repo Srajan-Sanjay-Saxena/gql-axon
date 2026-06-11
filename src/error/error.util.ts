@@ -1,84 +1,50 @@
-import { AppError } from "./app.error.base.js";
-import {
-  InternalServerError,
-  ValidationError,
-  ConflictError,
-} from "./strategy/error.strategy.js";
 import type {
   GqlAsyncResolver,
   GqlContextAndArgsMiddleware,
   GqlGuardMiddleware,
-  GqlRequestConfig,
 } from "../types/graphql/resolver.types.js";
-import type { GqlGlobalBaseContext } from "../types/graphql/context.types.js";
-
-
-export function catchGqlAsync<
-  TParent,
-  TArgs extends GqlRequestConfig["args"],
-  TContext extends Record<string, unknown>,
->(
-  resolverFn: (
-    parent: TParent,
-    args: TArgs,
-    context: TContext,
-    info: any,
-  ) => Promise<void>,
-): GqlGuardMiddleware<any, GqlGlobalBaseContext<TContext>, TArgs>;
+import { AppError } from "./app.error.base.js";
+import {
+  ConflictError,
+  InternalServerError,
+  ValidationError,
+} from "./strategy/error.strategy.js";
 
 export function catchGqlAsync<
-  TParent,
-  TArgs extends GqlRequestConfig["args"],
-  TContext,
-  TReturn extends Record<string, unknown>,
+  TArgs extends Record<string, unknown>,
+  TInjected extends Record<string, unknown> | undefined,
+  TBase extends Record<string, unknown>,
 >(
-  resolverFn: (
-    parent: TParent,
-    args: TArgs,
-    context: TContext,
-    info: any,
-  ) => Promise<TReturn>,
-): GqlContextAndArgsMiddleware<any, GqlGlobalBaseContext<TContext>, TArgs, TReturn>;
+  fn: GqlGuardMiddleware<TArgs, TInjected, TBase>,
+): GqlGuardMiddleware<TArgs, TInjected, TBase>;
 
-export function catchGqlAsync<TParent, TArgs, TContext, TReturn>(
-  resolverFn: (
-    parent: TParent,
-    args: TArgs,
-    context: TContext,
-    info: any,
-  ) => Promise<TReturn>,
-): <TFinalContext extends GqlGlobalBaseContext<TContext>>(
-  parent: TParent,
-  args: TArgs,
-  context: TFinalContext,
-  info: any,
-) => Promise<TReturn> {
-  return async <TFinalContext extends GqlGlobalBaseContext<TContext>>(
-    parent: TParent,
-    args: TArgs,
-    context: TFinalContext,
-    info: any,
-  ): Promise<TReturn> => {
+export function catchGqlAsync<
+  TArgs extends Record<string, unknown> | null,
+  TInjected extends Record<string, unknown> | undefined,
+  TBase extends Record<string, unknown>,
+  TReturn extends Record<string, unknown> | null,
+>(
+  fn: GqlContextAndArgsMiddleware<TArgs, TInjected, TBase, TReturn>,
+): GqlContextAndArgsMiddleware<TArgs, TInjected, TBase, TReturn>;
+
+export function catchGqlAsync<
+  TReturn,
+  TParent = any,
+  TArgs = unknown,
+  TContext = unknown,
+>(
+  fn: GqlAsyncResolver<TReturn,TParent, TArgs, TContext>,
+): GqlAsyncResolver<TReturn,TParent, TArgs, TContext>;
+
+export function catchGqlAsync(fn: (...args: any[]) => Promise<any>) {
+  return async (...args: any[]) => {
     try {
-      return await resolverFn(parent, args, context, info);
+      return await fn(...args);
     } catch (error: any) {
-      console.error(`[Resolver Error] ${info.fieldName}:`, error);
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      if (error.name === "ZodError") {
-        throw new ValidationError(error);
-      }
-
-      if (error.code === "P2002") {
-        throw new ConflictError(
-          "This username or email is already taken.",
-          error,
-        );
-      }
-
+      if (error instanceof AppError) throw error;
+      if (error.name === "ZodError") throw new ValidationError(error);
+      if (error.code === "P2002")
+        throw new ConflictError("Already exists.", error);
       throw new InternalServerError("Something went wrong.", error);
     }
   };
