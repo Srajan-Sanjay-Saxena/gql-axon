@@ -13,8 +13,13 @@ type VerifiedContext<
   TConfig extends GqlRequestConfig["context"],
   TBaseContext,
 > =
-  TConfig extends Record<string, any>
-    ? ValidDataBrand<MagicInjectedContext<TConfig["context"], TBaseContext>>
-    : TBaseContext;
+  TConfig extends Record<string, unknown>
+    ? {
+        validatedContext: ValidDataBrand<
+          MagicInjectedContext<TConfig, TBaseContext>
+        >;
+      }
+    : { validatedContext: ValidDataBrand<GqlGlobalBaseContext<TBaseContext>> };
+
 
 export type { GqlGlobalBaseContext, MagicInjectedContext, VerifiedContext };
