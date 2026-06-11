@@ -1,17 +1,53 @@
 {
   "name": "gql-axon",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Type-safe GraphQL middleware pipeline. Zod validation + branded types + builder pattern.",
   "type": "module",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc -b",
-    "start:dev_server": "node ./dist/server.js"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    }
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "graphql",
+    "middleware",
+    "pipeline",
+    "zod",
+    "validation",
+    "type-safe",
+    "branded-types",
+    "resolver",
+    "apollo",
+    "yoga"
+  ],
+  "author": "Srajan Sanjay Saxena",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Srajan-Sanjay-Saxena/gql-axon.git"
+  },
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
@@ -22,11 +58,16 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "graphql": "^16.14.1",
     "zod": "^4.4.3",
     "zod-validation-error": "^5.0.0"
+  },
+  "peerDependencies": {
+    "graphql": ">=16.0.0",
+    "zod": ">=4.0.0"
   }
 }
