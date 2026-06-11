@@ -3,7 +3,6 @@ import { z } from "zod";
 import { RequestGuardMiddleware } from "../src/core/engine.js";
 import {
   MiddlewareChainPipeline,
-  withChainedMiddleware,
 } from "../src/core/chain.middleware.js";
 import { catchGqlAsync } from "../src/error/error.util.js";
 import {
@@ -186,19 +185,18 @@ describe("Integration: Full Pipeline Flow", () => {
     });
   });
 
-  describe("withChainedMiddleware", () => {
+  describe("pipeline.execute produces standard GraphQL resolver", () => {
     it("produces a resolver with standard GraphQL signature", async () => {
       const guard = RequestGuardMiddleware({
         context: AuthContextSchema,
         args: CreatePostSchema,
       });
 
-      const resolver = withChainedMiddleware(
-        new MiddlewareChainPipeline().pipe(guard),
-        async (_parent, args, _context, _info) => {
+      const resolver = new MiddlewareChainPipeline()
+        .pipe(guard)
+        .execute(async (_parent, args, _context, _info) => {
           return { success: true };
-        },
-      );
+        });
 
       const context = { id: "u1", email: "a@b.com", req: {} } as any;
       const result = await resolver(
