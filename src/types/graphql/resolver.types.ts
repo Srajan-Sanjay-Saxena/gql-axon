@@ -3,23 +3,32 @@ import type { GqlGlobalBaseContext } from "./context.types.js";
 import type { MagicInjectedContext, VerifiedContext } from "./context.types.js";
 import type { ValidDataBrand } from "../brand.helper.js";
 
+
+type HasKeys<T> = keyof T extends never ? false : true;
+
 type GqlRequestConfig = {
-  readonly context?: Record<string, unknown>;
-  readonly args?: Record<string, unknown>;
+  context?: Record<string, unknown>;
+  args?: Record<string, unknown>;
 };
 
-type SchemaConfig<TConfig extends GqlRequestConfig> = {
-  context: z.ZodType<TConfig["context"]>;
-  args: z.ZodType<TConfig["args"]>;
-};
+type SchemaConfig<TConfig extends GqlRequestConfig> =
+  (HasKeys<TConfig["args"]> extends true
+    ? { args: z.ZodType<TConfig["args"]> }
+    : {}) &
+  (HasKeys<TConfig["context"]> extends true
+    ? { context: z.ZodType<TConfig["context"]> }
+    : {}) extends infer R
+    ? keyof R extends never ? never : R
+    : never;
+
 
 type VerifiedArgs<TArgs extends Record<string, unknown> | null> =
   TArgs extends Record<string, any>
     ? { validatedArgs: ValidDataBrand<TArgs> }
     : never;
 
-// The reason we are returning the direct promise of return without any verified brand wrapped over it is because we are expecting GQL async resolver to be the most basic resolver signature of the GraphQL that is being used in the queries and mutations. 
-type GqlAsyncResolver<Return , Parent , Args, Context> = (
+// The reason we are returning the direct promise of return without any verified brand wrapped over it is because we are expecting GQL async resolver to be the most basic resolver signature of the GraphQL that is being used in the queries and mutations.
+type GqlAsyncResolver<Return, Parent, Args, Context> = (
   parent: Parent,
   args: Args,
   context: Context,
@@ -52,7 +61,6 @@ type GqlContextAndArgsMiddleware<
   context: VerifiedContext<TInjected, TBaseContext>,
   info: any,
 ) => Promise<VerifiedArgs<TReturn>>;
-
 
 export type {
   GqlRequestConfig,
