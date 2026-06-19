@@ -11,7 +11,7 @@ import {
 } from "./strategy/error.strategy.js";
 
 export function catchGqlAsync<
-  TArgs extends Record<string, unknown>,
+  TArgs extends Record<string, unknown> | null,
   TInjected extends Record<string, unknown> | undefined,
   TBase extends Record<string, unknown>,
 >(
