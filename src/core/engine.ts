@@ -51,9 +51,9 @@ export function MakeObjectTypeSafeEngine<TObj>(
 }
 
 // since the request guard middleware is used at the most outer side that means we can say args and context will be unknown and we will validate them inside the middleware and then inject the validated data into the context for other middlewares and resolver to use, so we can say the input context and args are unknown but the output of this middleware will be validated context and args based on the provided schemas, so we can use the same middleware for both cases when we have args schema or when we don't have args schema, if we don't have args schema then we can return undefined for args in the output
-// Overload: with args schema → no null in return
+// Overload: with both args + context
 export function RequestGuardMiddleware<
-  TConfig extends GqlRequestConfig & { args: Record<string, unknown> },
+  TConfig extends GqlRequestConfig & { args: Record<string, unknown>; context: Record<string, unknown> },
   TBaseContext extends Record<string, unknown>,
 >(
   schemas: SchemaConfig<TConfig>,
@@ -64,9 +64,21 @@ export function RequestGuardMiddleware<
   unknown
 >;
 
-// Overload: without args schema → null
+// Overload: with args only (no context) — no TBaseContext needed
 export function RequestGuardMiddleware<
-  TConfig extends Omit<GqlRequestConfig, "args">,
+  TConfig extends GqlRequestConfig & { args: Record<string, unknown> },
+>(
+  schemas: SchemaConfig<TConfig>,
+): GqlAsyncResolver<
+  { validatedArgs: ValidDataBrand<TConfig["args"]> },
+  any,
+  unknown,
+  unknown
+>;
+
+// Overload: with context only (no args) — TBaseContext needed
+export function RequestGuardMiddleware<
+  TConfig extends GqlRequestConfig & { context: Record<string, unknown> },
   TBaseContext extends Record<string, unknown>,
 >(
   schemas: SchemaConfig<TConfig>,
