@@ -66,7 +66,7 @@ export function RequestGuardMiddleware<
 
 // Overload: without args schema → null
 export function RequestGuardMiddleware<
-  TConfig extends GqlRequestConfig,
+  TConfig extends Omit<GqlRequestConfig, "args">,
   TBaseContext extends Record<string, unknown>,
 >(
   schemas: SchemaConfig<TConfig>,
@@ -76,14 +76,15 @@ export function RequestGuardMiddleware<
   TConfig extends GqlRequestConfig,
   TBaseContext extends Record<string, unknown>,
 >(schemas: SchemaConfig<TConfig>) {
+  const s = schemas as { context?: z.ZodType<any>; args?: z.ZodType<any> };
   return catchGqlAsync<
     { validatedArgs: ValidDataBrand<TConfig["args"]> | null },
     any,
     unknown,
     unknown
   >(async (parent, args, context, info) => {
-    if (schemas.context) {
-      const result = MakeObjectTypeSafeEngine(schemas.context, context ?? {});
+    if (s.context) {
+      const result = MakeObjectTypeSafeEngine(s.context, context ?? {});
       if (!result.success) {
         throw new ValidationError(result.error);
       }
@@ -94,8 +95,8 @@ export function RequestGuardMiddleware<
       >;
     }
 
-    if (schemas.args) {
-      const result = MakeObjectTypeSafeEngine(schemas.args, args ?? {});
+    if (s.args) {
+      const result = MakeObjectTypeSafeEngine(s.args, args ?? {});
       if (!result.success) {
         throw new ValidationError(result.error);
       }
