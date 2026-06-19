@@ -73,7 +73,7 @@ export class MiddlewareChainPipeline<
       for (const mw of middlewares) {
         const result = await mw(parent, args, context, info);
         if (result !== undefined && result !== null) {
-          if (result.validatedArgs && accumulated.validatedArgs) {
+          if (result.validatedArgs) {
             accumulated = {
               ...accumulated,
               validatedArgs: { ...accumulated.validatedArgs, ...result.validatedArgs },
