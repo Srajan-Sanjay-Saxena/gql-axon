@@ -74,11 +74,11 @@ describe("RequestGuardMiddleware", () => {
       args: undefined as any,
     });
 
-    it("returns null validatedArgs when no args schema", async () => {
+    it("returns empty object when no args schema", async () => {
       const context = { id: "user_1", email: "test@test.com", req: {} } as any;
 
       const result = await contextOnlyGuard(null, undefined, context, mockInfo);
-      expect(result.validatedArgs).toBeNull();
+      expect(result).toEqual({});
     });
 
     it("still validates context", async () => {
