@@ -82,7 +82,7 @@ export function RequestGuardMiddleware<
   TBaseContext extends Record<string, unknown>,
 >(
   schemas: SchemaConfig<TConfig>,
-): GqlAsyncResolver<{ validatedArgs: null }, any, unknown, unknown>;
+): GqlAsyncResolver<{}, any, unknown, unknown>;
 
 export function RequestGuardMiddleware<
   TConfig extends GqlRequestConfig,
@@ -90,7 +90,7 @@ export function RequestGuardMiddleware<
 >(schemas: SchemaConfig<TConfig>) {
   const s = schemas as { context?: z.ZodType<any>; args?: z.ZodType<any> };
   return catchGqlAsync<
-    { validatedArgs: ValidDataBrand<TConfig["args"]> | null },
+    { validatedArgs: ValidDataBrand<TConfig["args"]> } | {},
     any,
     unknown,
     unknown
@@ -115,6 +115,6 @@ export function RequestGuardMiddleware<
       return { validatedArgs: result.data };
     }
 
-    return { validatedArgs: null };
+    return {};
   });
 }
