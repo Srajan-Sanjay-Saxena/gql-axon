@@ -28,8 +28,8 @@ export class MiddlewareChainPipeline<
 
   public pipe<
     TReturn extends {
-      validatedArgs: ValidDataBrand<Record<string, unknown>> | null;
-    },
+      validatedArgs: ValidDataBrand<Record<string, unknown>>;
+    } | {},
   >(
     middleware: GqlAsyncResolver<TReturn, unknown, unknown, any>,
   ): MiddlewareChainPipeline<TVerifiedArgs & TReturn>;
